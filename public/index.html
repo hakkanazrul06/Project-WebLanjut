@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Management - Laravel REST API</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f4f6f9;
+            color: #333;
+            padding: 24px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        header {
+            background: #2563eb;
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        header h1 { font-size: 24px; }
+        .badge {
+            background: #10b981;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .card h2 { font-size: 18px; margin-bottom: 16px; color: #1e293b; }
+        .form-group {
+            display: grid;
+            grid-template-columns: 2fr 1fr auto;
+            gap: 12px;
+        }
+        input {
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #1d4ed8; }
+        button.delete-btn {
+            background: #ef4444;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        button.delete-btn:hover { background: #dc2626; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th { background: #f8fafc; font-weight: 600; color: #64748b; font-size: 13px; text-transform: uppercase; }
+        tr:hover { background: #f8fafc; }
+        .price { font-weight: 600; color: #059669; }
+        .empty { text-align: center; color: #94a3b8; padding: 32px; }
+        .api-info {
+            background: #f1f5f9;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #475569;
+            margin-top: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>📦 Product Dashboard</h1>
+                <p style="font-size: 14px; opacity: 0.9; margin-top: 4px;">Laravel REST API & Flutter Backend</p>
+            </div>
+            <span class="badge">API Online (HTTPS)</span>
+        </header>
+
+        <div class="card">
+            <h2>Tambah Produk Baru</h2>
+            <form id="productForm" class="form-group">
+                <input type="text" id="name" placeholder="Nama Produk (misal: Keyboard)" required>
+                <input type="number" id="price" placeholder="Harga (Rp)" required min="0">
+                <button type="submit">+ Simpan</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Daftar Produk</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>Nama Produk</th>
+                        <th>Harga</th>
+                        <th style="width: 100px;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="productList">
+                    <tr><td colspan="4" class="empty">Memuat data produk...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="api-info">
+            Endpoints REST API aktif: 
+            <a href="/products" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: 600;">/products</a> (JSON)
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/products';
+
+        async function loadProducts() {
+            try {
+                const res = await fetch(API_URL);
+                const result = await res.json();
+                const tbody = document.getElementById('productList');
+                
+                if (!result.data || result.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty">Belum ada data produk.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = result.data.map((p, idx) => `
+                    <tr>
+                        <td>${idx + 1}</td>
+                        <td><strong>${escapeHtml(p.name)}</strong></td>
+                        <td class="price">Rp ${Number(p.price).toLocaleString('id-ID')}</td>
+                        <td>
+                            <button class="delete-btn" onclick="deleteProduct(${p.id})">Hapus</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                document.getElementById('productList').innerHTML = 
+                    '<tr><td colspan="4" class="empty" style="color: #ef4444;">Gagal memuat produk dari API.</td></tr>';
+            }
+        }
+
+        document.getElementById('productForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value.trim();
+            const price = parseFloat(document.getElementById('price').value);
+
+            if (!name || isNaN(price)) return;
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ name, price })
+                });
+
+                if (res.ok) {
+                    document.getElementById('name').value = '';
+                    document.getElementById('price').value = '';
+                    loadProducts();
+                } else {
+                    alert('Gagal menambah produk.');
+                }
+            } catch (err) {
+                alert('Terjadi kesalahan jaringan.');
+            }
+        });
+
+        async function deleteProduct(id) {
+            if (!confirm('Yakin ingin menghapus produk ini?')) return;
+            try {
+                const res = await fetch(`${API_URL}/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    loadProducts();
+                } else {
+                    alert('Gagal menghapus produk.');
+                }
+            } catch (err) {
+                alert('Terjadi kesalahan jaringan.');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        loadProducts();
+    </script>
+</body>
+</html>
