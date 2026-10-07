@@ -27,5 +27,11 @@ if (!file_exists($targetSqlite)) {
     }
 }
 
+// Fix REQUEST_URI when running inside /api serverless function so Laravel gets standard path
+if (isset($_SERVER['REQUEST_URI'])) {
+    // If Vercel prefixes the script path or strips /api, normalize it
+    $_SERVER['SCRIPT_NAME'] = '/index.php';
+}
+
 // Forward to Laravel public/index.php
 require __DIR__ . '/../public/index.php';
